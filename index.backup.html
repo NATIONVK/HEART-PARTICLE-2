@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>Heart Particle 2</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#000;
+  touch-action:none;
+  font-family:Arial,sans-serif;
+}
+
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+  background:#000;
+  touch-action:none;
+}
+
+/* SETTINGS BUTTON */
+#settingsButton{
+  position:fixed;
+  top:16px;
+  right:16px;
+  z-index:10;
+  width:38px;
+  height:38px;
+  border:1px solid rgba(50,145,255,.3);
+  border-radius:12px;
+  background:rgba(3,15,35,.72);
+  color:#64baff;
+  font-size:19px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+
+/* SETTINGS PANEL */
+#settingsPanel{
+  position:fixed;
+  top:62px;
+  right:16px;
+  z-index:11;
+  width:min(245px,calc(100vw - 32px));
+  padding:16px;
+  border:1px solid rgba(50,145,255,.25);
+  border-radius:15px;
+  background:rgba(3,9,22,.94);
+  color:#dceeff;
+  box-shadow:0 8px 35px rgba(0,65,180,.15);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  max-height:calc(100vh - 90px);overflow-y:auto;overscroll-behavior:contain;
+  display:none;
+}
+
+#settingsPanel.open{
+  display:block;
+}
+
+.panelHeader{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:17px;
+}
+
+.panelHeader strong{
+  font-size:13px;
+  letter-spacing:1.5px;
+  color:#7bc4ff;
+}
+
+#closeSettings{
+  border:0;
+  background:none;
+  color:#8cbce9;
+  font-size:21px;
+  cursor:pointer;
+  padding:2px 5px;
+}
+
+.control{
+  margin-bottom:18px;
+}
+
+.controlTop{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+  font-size:12px;
+  color:#c4dcf5;
+}
+
+.controlTop output{
+  color:#61b5ff;
+  font-variant-numeric:tabular-nums;
+}
+
+input[type="range"]{
+  display:block;
+  width:100%;
+  height:4px;
+  border-radius:10px;
+  accent-color:#258fff;
+  cursor:pointer;
+}
+
+.toggleRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-size:12px;
+  color:#c4dcf5;
+}
+
+.toggleRow input{
+  accent-color:#258fff;
+  width:17px;
+  height:17px;
+}
+
+.panelNote{
+  font-size:10px;
+  color:rgba(140,190,235,.55);
+  line-height:1.5;
+  margin-top:5px;
+}
+
+#hint{
+  position:fixed;
+  bottom:24px;
+  left:0;
+  width:100%;
+  text-align:center;
+  color:rgba(75,165,255,.4);
+  font-size:11px;
+  letter-spacing:3px;
+  pointer-events:none;
+  transition:opacity 1s;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<button id="settingsButton" aria-label="Settings">⚙</button>
+
+<div id="settingsPanel">
+  <div class="panelHeader">
+    <strong>HEART SETTINGS</strong>
+    <button id="closeSettings" aria-label="Close">×</button>
+  </div>
+
+  <div class="control">
+    <div class="controlTop">
+      <label for="heartSize">Heart Size</label>
+      <output id="heartSizeValue">100%</output>
+    </div>
+    <input id="heartSize" type="range"
+      min="70" max="135" value="100" step="1">
+  </div>
+
+  <div class="control">
+    <div class="controlTop">
+      <label for="motion">Particle Movement</label>
+      <output id="motionValue">300%</output>
+    </div>
+    <input id="motion" type="range"
+      min="100" max="600" value="300" step="25">
+  </div>
+
+  <div class="control">
+    <div class="controlTop">
+      <label for="heartbeatControl">Heartbeat Intensity</label>
+      <output id="heartbeatValue">100%</output>
+    </div>
+    <input id="heartbeatControl" type="range"
+      min="0" max="180" value="100" step="5">
+  </div>
+
+  <div class="toggleRow"><label for="autoDissolve">Auto Dissolve & Reform</label><input id="autoDissolve" type="checkbox" checked></div>
+  <div class="toggleRow"><label for="rotation3D">3D Heart Rotation</label><input id="rotation3D" type="checkbox" checked></div>
+  <div class="toggleRow"><label for="trailToggle">Particle Trails</label><input id="trailToggle" type="checkbox" checked></div>
+  <div class="toggleRow"><label for="shockwaveToggle">Heartbeat Shockwaves</label><input id="shockwaveToggle" type="checkbox" checked></div>
+
+  <p class="panelNote">
+    Adjust the heart and particle animation without interrupting the experience.
+  </p>
+</div>
+
+<div id="hint">TOUCH • DRAG • RELEASE</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ELEMENTS */
+
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d",{alpha:false});
+const hint=document.getElementById("hint");
+
+const settingsButton=document.getElementById("settingsButton");
+const settingsPanel=document.getElementById("settingsPanel");
+const closeSettings=document.getElementById("closeSettings");
+
+const heartSizeInput=document.getElementById("heartSize");
+const motionInput=document.getElementById("motion");
+const heartbeatInput=document.getElementById("heartbeatControl");
+const autoDissolveInput=document.getElementById("autoDissolve");
+const rotation3DInput=document.getElementById("rotation3D"),trailInput=document.getElementById("trailToggle"),shockwaveInput=document.getElementById("shockwaveToggle");
+
+const heartSizeValue=document.getElementById("heartSizeValue");
+const motionValue=document.getElementById("motionValue");
+const heartbeatValue=document.getElementById("heartbeatValue");
+
+/* UTILITIES */
+
+const TAU=Math.PI*2;
+const rand=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+/* CONFIG */
+
+const CONFIG={
+  mobileCount:1600,
+  desktopCount:2800,
+  ambientCount:100,
+  baseHeartScale:.235,
+  dissolveDuration:2.8,
+  gatherDuration:2.1
+};
+
+let heartSizeMultiplier=1;
+let motionMultiplier=3;
+let heartbeatMultiplier=1;
+let autoDissolve=true,rotation3D=true,trailsEnabled=true,shockwavesEnabled=true;
+const PALETTE=[[37,143,255],[157,91,255],[255,76,174],[255,145,58],[34,222,205],[255,220,72]];
+let activeColor="rgb(37,143,255)",activeColorRGB=PALETTE[0].slice(),shockwaves=[],lastHeartbeat=0;
+
+/* STATE */
+
+let W=0,H=0,DPR=1;
+let particles=[];
+let ambient=[];
+
+let lastTime=0;
+let clock=0;
+let frame=0;
+
+let mode="normal";
+
+let pointer={
+  x:0,
+  y:0,
+  down:false,
+  active:false
+};
+
+let heartCenter={x:0,y:0};
+
+let gatherTime=0;
+let dissolveTime=0;
+let nextDissolve=24;
+let heartbeat=0;
+
+/* SETTINGS UI */
+
+function toggleSettings(){
+  settingsPanel.classList.toggle("open");
+}
+
+settingsButton.addEventListener("click",e=>{
+  e.stopPropagation();
+  toggleSettings();
+});
+
+closeSettings.addEventListener("click",()=>{
+  settingsPanel.classList.remove("open");
+});
+
+settingsPanel.addEventListener("pointerdown",e=>{
+  e.stopPropagation();
+});
+
+settingsPanel.addEventListener("pointermove",e=>{
+  e.stopPropagation();
+});
+
+settingsPanel.addEventListener("pointerup",e=>{
+  e.stopPropagation();
+});
+
+heartSizeInput.addEventListener("input",()=>{
+  heartSizeMultiplier=Number(heartSizeInput.value)/100;
+  heartSizeValue.textContent=heartSizeInput.value+"%";
+});
+
+motionInput.addEventListener("input",()=>{
+  motionMultiplier=Number(motionInput.value)/100;
+  motionValue.textContent=motionInput.value+"%";
+});
+
+heartbeatInput.addEventListener("input",()=>{
+  heartbeatMultiplier=Number(heartbeatInput.value)/100;
+  heartbeatValue.textContent=heartbeatInput.value+"%";
+});
+
+autoDissolveInput.addEventListener("change",()=>{autoDissolve=autoDissolveInput.checked;});
+rotation3DInput.addEventListener("change",()=>rotation3D=rotation3DInput.checked);
+trailInput.addEventListener("change",()=>trailsEnabled=trailInput.checked);
+shockwaveInput.addEventListener("change",()=>shockwavesEnabled=shockwaveInput.checked);
+
+/* HEART GEOMETRY */
+
+function heartPoint(t){
+  const x=16*Math.pow(Math.sin(t),3);
+
+  const y=-(13*Math.cos(t)
+    -5*Math.cos(2*t)
+    -2*Math.cos(3*t)
+    -Math.cos(4*t));
+
+  return{x,y};
+}
+
+function createHeartTarget(){
+  const t=Math.random()*TAU;
+  const p=heartPoint(t);
+  const r=Math.sqrt(Math.random());
+
+  return{
+    x:p.x*r*.94,
+    y:p.y*r*.94
+  };
+}
+
+function heartScale(){
+  return Math.min(W,H)*
+    CONFIG.baseHeartScale*
+    heartSizeMultiplier/16;
+}
+
+function getHeartPosition(x,y,z=0){
+  const scale=heartScale(),pulse=1+heartbeat*.045*heartbeatMultiplier;
+  const yaw=rotation3D?Math.sin(clock*.32)*.48:0,pitch=rotation3D?Math.sin(clock*.21)*.12:0;
+  const rx=x*Math.cos(yaw)-z*18*Math.sin(yaw),rz=x*Math.sin(yaw)+z*18*Math.cos(yaw);
+  const ry=y*Math.cos(pitch)-rz*Math.sin(pitch),depth=clamp(1+rz*.012,-.25,1.75);
+  return{x:heartCenter.x+rx*scale*pulse*depth,y:heartCenter.y+ry*scale*pulse*depth};
+}
+
+/* PARTICLE CLASS */
+
+class Particle{
+  constructor(i){
+    this.id=i;
+    this.target=createHeartTarget();
+
+    this.x=rand(-W,W*2);this.y=rand(-H,H*2);this.prevX=this.x;this.prevY=this.y;
+    this.vx=0;
+    this.vy=0;
+
+    this.z=rand(-.6,.6);
+
+    // Uniform brightness
+    this.size=rand(.85,1.15);
+    this.phase=rand(0,TAU);
+    this.alpha=rand(.76,.82);
+    this.hue=205;
+
+    this.spiral=rand(-1,1);
+
+    this.startX=this.x;
+    this.startY=this.y;
+
+    this.orbitAngle=rand(0,TAU);
+    this.orbitRadius=rand(.5,1.5);
+  }
+
+  setStart(){
+    this.startX=this.x;
+    this.startY=this.y;
+  }
+
+  /* MORE NATURAL NORMAL MOVEMENT */
+
+  updateNormal(dt){
+    this.prevX=this.x;this.prevY=this.y;
+    const pos=getHeartPosition(
+      this.target.x,
+      this.target.y,
+      this.z
+    );
+
+    const speed=motionMultiplier;
+
+    // Independent particle movement
+    const wave1=Math.sin(
+      clock*2.1*speed+this.phase
+    );
+
+    const wave2=Math.cos(
+      clock*1.55*speed+this.phase*1.7
+    );
+
+    const wave3=Math.sin(
+      clock*.85*speed+this.phase*2.4
+    );
+
+    // Small circular orbital movement
+    this.orbitAngle+=dt*(
+      .45+this.orbitRadius*.3
+    )*speed;
+
+    const orbitX=
+      Math.cos(this.orbitAngle)*
+      this.orbitRadius*1.15;
+
+    const orbitY=
+      Math.sin(this.orbitAngle)*
+      this.orbitRadius*1.15;
+
+    // Controlled movement keeps the heart silhouette intact
+    const wobbleX=
+      (wave1*2.3+wave3*1.0+orbitX)*Math.sqrt(speed);
+
+    const wobbleY=
+      (wave2*2.3+wave3*.8+orbitY)*Math.sqrt(speed);
+
+    const tx=pos.x+wobbleX;
+    const ty=pos.y+wobbleY;
+
+    // Smooth magnetic return to target
+    const follow=clamp(dt*6.5*Math.sqrt(speed),0,1);
+
+    this.x=lerp(this.x,tx,follow);
+    this.y=lerp(this.y,ty,follow);
+
+    // Depth animation
+    this.z+=Math.sin(
+      clock*.7*speed+this.phase
+    )*dt*.045*speed;
+
+    this.z=clamp(this.z,-.6,.6);
+  }
+
+  updateExplode(dt){
+    this.prevX=this.x;this.prevY=this.y;
+    this.vx*=Math.pow(.985,dt*60);
+    this.vy*=Math.pow(.985,dt*60);
+
+    this.x+=this.vx*dt;
+    this.y+=this.vy*dt;
+
+    if(pointer.down){
+      const dx=pointer.x-this.x;
+      const dy=pointer.y-this.y;
+
+      const d2=dx*dx+dy*dy+120;
+      const force=clamp(19000/d2,0,22);
+      this.vx-=dx*force*dt;this.vy-=dy*force*dt;
+    }
+  }
+
+  updateGather(dt,progress){
+    const pos=getHeartPosition(
+      this.target.x,
+      this.target.y,
+      this.z
+    );
+
+    const angle=this.spiral*(1-progress)*5.2;
+    const radius=(1-progress)*Math.min(W,H)*.10;
+
+    const spiralX=Math.cos(angle)*radius;
+    const spiralY=Math.sin(angle)*radius;
+
+    const ease=progress*progress*(3-2*progress);
+
+    const tx=lerp(this.startX,pos.x,ease)+spiralX;
+    const ty=lerp(this.startY,pos.y,ease)+spiralY;
+
+    this.prevX=this.x;this.prevY=this.y;
+    this.x=lerp(this.x,tx,clamp(dt*10,0,1));
+    this.y=lerp(this.y,ty,clamp(dt*10,0,1));
+
+    this.vx*=.9;
+    this.vy*=.9;
+  }
+
+  /* UNIFORM PARTICLE RENDERING */
+
+  draw(){
+    const depth=1+this.z*.08;
+
+    const twinkle=
+      .97+.03*Math.sin(clock*1.5+this.phase);
+
+    const size=this.size*depth;
+    const alpha=this.alpha*twinkle;
+
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=activeColor;
+
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,size,0,TAU);
+    ctx.fill();
+
+    // Very soft glow
+    ctx.globalAlpha=alpha*.08;
+    ctx.fillStyle=activeColor;
+
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,size*2,0,TAU);
+    ctx.fill();
+  }
+}
+
+/* AMBIENT PARTICLES */
+
+class AmbientParticle{
+  constructor(){
+    this.reset(true);
+  }
+
+  reset(initial=false){
+    this.x=rand(0,W);
+    this.y=initial?rand(0,H):rand(-30,H+30);
+
+    this.vx=rand(-12,12);
+    this.vy=rand(-22,-5);
+
+    this.size=rand(.4,1.2);
+    this.alpha=rand(.15,.35);
+    this.phase=rand(0,TAU);
+  }
+
+  update(dt){
+    this.x+=this.vx*dt+
+      Math.sin(clock+this.phase)*dt*5;
+
+    this.y+=this.vy*dt;
+
+    const dx=heartCenter.x-this.x;
+    const dy=heartCenter.y-this.y;
+    const d=Math.sqrt(dx*dx+dy*dy)+1;
+
+    if(d<Math.min(W,H)*.43){
+      const strength=
+        (1-d/(Math.min(W,H)*.43))*18;
+
+      this.vx+=dx/d*strength*dt;
+      this.vy+=dy/d*strength*dt;
+    }
+
+    if(this.y<-35||this.x<-35||this.x>W+35){
+      this.reset();
+    }
+  }
+
+  draw(){
+    ctx.globalAlpha=this.alpha*
+      (.7+.3*Math.sin(clock*2+this.phase));
+
+    ctx.fillStyle=activeColor;
+
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.size,0,TAU);
+    ctx.fill();
+  }
+}
+
+/* SPIRAL STREAM */
+
+function drawSpiralStreams(){
+  ctx.save();
+  ctx.globalCompositeOperation="source-over";
+
+  for(let j=0;j<3;j++){
+    const direction=j%2===0?1:-1;
+
+    ctx.beginPath();
+
+    for(let i=0;i<70;i++){
+      const t=i/69;
+
+      const angle=
+        clock*.65*direction+
+        t*TAU*1.7+j*2.1;
+
+      const radius=heartScale()*(21-t*13);
+
+      const x=heartCenter.x+
+        Math.cos(angle)*radius;
+
+      const y=heartCenter.y+
+        Math.sin(angle)*radius*.7;
+
+      if(i===0)ctx.moveTo(x,y);
+      else ctx.lineTo(x,y);
+    }
+
+    ctx.strokeStyle=colorRGBA(.11);
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/* ENERGY WAVE */
+
+function drawEnergy(){
+  const scale=heartScale();
+
+  ctx.save();
+  ctx.globalCompositeOperation="source-over";
+
+  for(let i=0;i<2;i++){
+    const radius=scale*(15+i*2)+
+      Math.sin(clock*1.5+i)*3;
+
+    ctx.beginPath();
+
+    ctx.ellipse(
+      heartCenter.x,
+      heartCenter.y,
+      radius,
+      radius*.85,
+      0,0,TAU
+    );
+
+    ctx.strokeStyle=colorRGBA(.055-i*.012);
+
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/* HEARTBEAT */
+
+function updateHeartbeat(){
+  const beat=(clock*1.15)%TAU;heartbeat=Math.pow(Math.max(0,Math.sin(beat)),12);
+  if(shockwavesEnabled&&heartbeat>.82&&lastHeartbeat<=.82)spawnShockwave(heartCenter.x,heartCenter.y,.55);
+  lastHeartbeat=heartbeat;
+}
+function updatePalette(){
+  const segment=900,elapsed=clock%(segment*PALETTE.length),index=Math.floor(elapsed/segment),within=elapsed-index*segment;
+  const from=PALETTE[index],to=PALETTE[(index+1)%PALETTE.length],t=within<=720?0:clamp((within-720)/180,0,1),ease=t*t*(3-2*t);
+  activeColorRGB=from.map((v,i)=>Math.round(lerp(v,to[i],ease)));activeColor=`rgb(${activeColorRGB.join(",")})`;
+}
+function colorRGBA(a){return `rgba(${activeColorRGB[0]},${activeColorRGB[1]},${activeColorRGB[2]},${a})`;}
+function spawnShockwave(x,y,strength=1){shockwaves.push({x,y,r:8,life:0,max:1.15,strength});if(shockwaves.length>14)shockwaves.shift();}
+function updateShockwaves(dt){for(let i=shockwaves.length-1;i>=0;i--){const w=shockwaves[i];w.life+=dt;w.r+=dt*(150+110*w.strength);if(w.life>=w.max)shockwaves.splice(i,1);}}
+function drawShockwaves(){if(!shockwavesEnabled)return;ctx.save();ctx.globalCompositeOperation="lighter";for(const w of shockwaves){const a=(1-w.life/w.max)*.28;ctx.beginPath();ctx.arc(w.x,w.y,w.r,0,TAU);ctx.strokeStyle=colorRGBA(a);ctx.lineWidth=1.5+2*a;ctx.shadowBlur=16;ctx.shadowColor=activeColor;ctx.stroke();}ctx.restore();}
+/* RESIZE */
+
+function resize(){
+  const oldW=W,oldH=H;
+
+  W=window.innerWidth;
+  H=window.innerHeight;
+
+  DPR=Math.min(window.devicePixelRatio||1,1.6);
+
+  canvas.width=Math.round(W*DPR);
+  canvas.height=Math.round(H*DPR);
+
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+
+  if(!particles.length){
+    heartCenter.x=W/2;
+    heartCenter.y=H/2;
+
+    const count=W<700?
+      CONFIG.mobileCount:CONFIG.desktopCount;
+
+    for(let i=0;i<count;i++){
+      particles.push(new Particle(i));
+    }
+
+    for(let i=0;i<CONFIG.ambientCount;i++){
+      ambient.push(new AmbientParticle());
+    }
+
+  }else{
+    const sx=oldW?W/oldW:1;
+    const sy=oldH?H/oldH:1;
+
+    for(const p of particles){
+      p.x*=sx;
+      p.y*=sy;
+      p.startX*=sx;
+      p.startY*=sy;
+    }
+
+    for(const a of ambient){
+      a.x*=sx;
+      a.y*=sy;
+    }
+
+    heartCenter.x=W/2;
+    heartCenter.y=H/2;
+  }
+}
+
+window.addEventListener("resize",resize,{passive:true});
+
+/* EXPLOSION */
+
+function explodeHeart(){
+  if(mode==="explode")return;
+
+  mode="explode";
+
+  for(const p of particles){
+    const dx=p.x-heartCenter.x;
+    const dy=p.y-heartCenter.y;
+
+    const distance=Math.sqrt(dx*dx+dy*dy)+1;
+    const power=rand(100,390);
+
+    p.vx=dx/distance*power+rand(-90,90);
+    p.vy=dy/distance*power+rand(-90,90);
+
+    p.setStart();
+  }
+}
+
+/* REFORMATION */
+
+function reformHeart(x,y){
+  heartCenter.x=clamp(x,40,W-40);
+  heartCenter.y=clamp(y,40,H-40);
+
+  gatherTime=0;
+
+  for(const p of particles){
+    p.setStart();
+    p.spiral=rand(-1,1);
+  }
+
+  mode="gather";
+}
+
+/* AUTO DISSOLVE */
+
+function startDissolve(){
+  if(mode!=="normal")return;
+
+  mode="dissolve";
+  dissolveTime=0;
+
+  for(const p of particles){
+    const dx=p.x-heartCenter.x;
+    const dy=p.y-heartCenter.y;
+
+    const d=Math.sqrt(dx*dx+dy*dy)+1;
+
+    p.vx=dx/d*rand(20,100)+rand(-20,20);
+    p.vy=dy/d*rand(20,100)+rand(-20,20);
+
+    p.setStart();
+  }
+}
+
+/* POINTER INTERACTION */
+
+function pointerDownHandler(e){
+  if(settingsPanel.contains(e.target)||
+     settingsButton.contains(e.target))return;
+
+  e.preventDefault();
+
+  pointer.x=e.clientX;
+  pointer.y=e.clientY;
+  pointer.down=true;
+  pointer.active=true;
+
+  hint.style.opacity="0";spawnShockwave(pointer.x,pointer.y,1.25);
+
+  if(mode==="gather"||mode==="dissolve"){
+    mode="explode";
+    for(const p of particles)p.setStart();
+  }
+
+  if(mode==="normal"){
+    for(const p of particles){
+      p.updateNormal(1/60);
+    }
+  }
+
+  explodeHeart();
+}
+
+function pointerMoveHandler(e){
+  if(!pointer.down)return;
+
+  e.preventDefault();
+
+  pointer.x=e.clientX;
+  pointer.y=e.clientY;
+}
+
+function pointerUpHandler(e){
+  if(!pointer.down)return;
+
+  if(e&&Number.isFinite(e.clientX)){
+    pointer.x=e.clientX;
+    pointer.y=e.clientY;
+  }
+
+  pointer.down=false;
+
+  reformHeart(
+    pointer.x||W/2,
+    pointer.y||H/2
+  );
+}
+
+canvas.addEventListener("pointerdown",pointerDownHandler);
+canvas.addEventListener("pointermove",pointerMoveHandler);
+window.addEventListener("pointerup",pointerUpHandler);
+window.addEventListener("pointercancel",pointerUpHandler);
+
+/* BACKGROUND */
+
+function drawBackground(){
+  ctx.fillStyle="rgba(0,0,0,.24)";ctx.fillRect(0,0,W,H);
+  const g=ctx.createRadialGradient(W*.5,H*.48,Math.min(W,H)*.04,W*.5,H*.48,Math.max(W,H)*.72);g.addColorStop(0,"rgba(4,22,58,.13)");g.addColorStop(.55,"rgba(0,9,28,.055)");g.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.25,W/2,H/2,Math.max(W,H)*.78);v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(1,"rgba(0,0,0,.42)");ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+}
+
+function drawGlassGlow(){
+  const scale=heartScale();
+
+  ctx.save();
+  ctx.globalCompositeOperation="source-over";
+
+  const glow=ctx.createRadialGradient(
+    heartCenter.x,heartCenter.y,scale*2,
+    heartCenter.x,heartCenter.y,scale*22
+  );
+
+  glow.addColorStop(0,colorRGBA(.075));
+  glow.addColorStop(.45,colorRGBA(.025));
+  glow.addColorStop(1,"rgba(0,0,0,0)");
+
+  ctx.fillStyle=glow;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.restore();
+}
+
+/* RENDER PARTICLES */
+
+function drawParticles(){
+  ctx.save();ctx.globalCompositeOperation="lighter";
+  if(trailsEnabled){ctx.lineWidth=.7;ctx.strokeStyle=colorRGBA(.095);for(let i=0;i<particles.length;i+=3){const p=particles[i],dx=p.x-p.prevX,dy=p.y-p.prevY;if(dx*dx+dy*dy>1&&dx*dx+dy*dy<900){ctx.beginPath();ctx.moveTo(p.prevX,p.prevY);ctx.lineTo(p.x,p.y);ctx.stroke();}}}
+  ctx.globalCompositeOperation="source-over";for(const p of particles)p.draw();ctx.restore();
+}
+
+function drawAmbient(){
+  ctx.save();
+  ctx.globalCompositeOperation="source-over";
+
+  for(const a of ambient){
+    a.draw();
+  }
+
+  ctx.restore();
+}
+
+/* MAIN ANIMATION LOOP */
+
+function animate(timestamp){
+  if(!lastTime)lastTime=timestamp;
+
+  const dt=Math.min(
+    (timestamp-lastTime)/1000,.033
+  );
+
+  lastTime=timestamp;
+  clock+=dt;
+  frame++;updatePalette();updateHeartbeat();updateShockwaves(dt);
+  drawBackground();
+
+  // Gentle parallax
+  if(!pointer.down&&mode==="normal"){
+    const px=Math.sin(clock*.3)*W*.002;
+    const py=Math.cos(clock*.25)*H*.002;
+
+    heartCenter.x=lerp(
+      heartCenter.x,W/2+px,dt*.8
+    );
+
+    heartCenter.y=lerp(
+      heartCenter.y,H/2+py,dt*.8
+    );
+  }
+
+  drawGlassGlow();
+
+  for(const a of ambient){
+    a.update(dt);
+  }
+
+  drawAmbient();
+
+  if(mode==="normal"){
+    for(const p of particles){
+      p.updateNormal(dt);
+    }
+
+    drawSpiralStreams();drawEnergy();
+
+    if(autoDissolve&&clock>nextDissolve){
+      startDissolve();
+      nextDissolve=clock+rand(24,34);
+    }
+  }
+
+  else if(mode==="explode"){
+    for(const p of particles){
+      p.updateExplode(dt);
+    }
+
+    drawSpiralStreams();
+
+    if(!pointer.down){
+      reformHeart(
+        pointer.x||W/2,
+        pointer.y||H/2
+      );
+    }
+  }
+
+  else if(mode==="gather"){
+    gatherTime+=dt;
+
+    const progress=clamp(
+      gatherTime/CONFIG.gatherDuration,
+      0,1
+    );
+
+    for(const p of particles){
+      p.updateGather(dt,progress);
+    }
+
+    drawSpiralStreams();
+
+    if(progress>=1){
+      mode="normal";
+
+      for(const p of particles){
+        const pos=getHeartPosition(
+          p.target.x,p.target.y,p.z
+        );
+
+        p.x=pos.x;
+        p.y=pos.y;
+        p.vx=0;
+        p.vy=0;
+      }
+    }
+  }
+
+  else if(mode==="dissolve"){
+    dissolveTime+=dt;
+
+    const progress=clamp(
+      dissolveTime/CONFIG.dissolveDuration,
+      0,1
+    );
+
+    for(const p of particles){
+      p.vx*=Math.pow(.965,dt*60);
+      p.vy*=Math.pow(.965,dt*60);
+
+      p.x+=p.vx*dt;
+      p.y+=p.vy*dt;
+
+      if(progress>.45){
+        const pos=getHeartPosition(
+          p.target.x,p.target.y,p.z
+        );
+
+        p.x=lerp(
+          p.x,pos.x,clamp(dt*1.5,0,1)
+        );
+
+        p.y=lerp(
+          p.y,pos.y,clamp(dt*1.5,0,1)
+        );
+      }
+    }
+
+    drawSpiralStreams();
+
+    if(progress>=1){
+      for(const p of particles){
+        const pos=getHeartPosition(
+          p.target.x,p.target.y,p.z
+        );
+
+        p.x=pos.x;
+        p.y=pos.y;
+        p.vx=0;
+        p.vy=0;
+      }
+
+      mode="normal";
+    }
+  }
+
+  drawParticles();drawShockwaves();
+  ctx.globalAlpha=1;
+
+  requestAnimationFrame(animate);
+}
+
+/* START */
+
+resize();document.addEventListener("visibilitychange",()=>{lastTime=0;});
+requestAnimationFrame(animate);
+
+})();
+</script>
+</body>
+</html>
