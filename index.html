@@ -281,6 +281,7 @@ let pointer={
 };
 
 let heartCenter={x:0,y:0};
+let userPositioned=false;
 
 let gatherTime=0;
 let dissolveTime=0;
@@ -718,8 +719,8 @@ function updateHeartbeat(){
   lastHeartbeat=heartbeat;
 }
 function updatePalette(){
-  const segment=900,elapsed=clock%(segment*PALETTE.length),index=Math.floor(elapsed/segment),within=elapsed-index*segment;
-  const from=PALETTE[index],to=PALETTE[(index+1)%PALETTE.length],t=within<=720?0:clamp((within-720)/180,0,1),ease=t*t*(3-2*t);
+  const segment=30,elapsed=clock%(segment*PALETTE.length),index=Math.floor(elapsed/segment),within=elapsed-index*segment;
+  const from=PALETTE[index],to=PALETTE[(index+1)%PALETTE.length],t=within<=28?0:clamp((within-28)/2,0,1),ease=t*t*(3-2*t);
   activeColorRGB=from.map((v,i)=>Math.round(lerp(v,to[i],ease)));activeColor=`rgb(${activeColorRGB.join(",")})`;
 }
 function colorRGBA(a){return `rgba(${activeColorRGB[0]},${activeColorRGB[1]},${activeColorRGB[2]},${a})`;}
@@ -803,6 +804,7 @@ function explodeHeart(){
 /* REFORMATION */
 
 function reformHeart(x,y){
+  userPositioned=true;
   heartCenter.x=clamp(x,40,W-40);
   heartCenter.y=clamp(y,40,H-40);
 
@@ -959,7 +961,7 @@ function animate(timestamp){
   drawBackground();
 
   // Gentle parallax
-  if(!pointer.down&&mode==="normal"){
+  if(!userPositioned&&!pointer.down&&mode==="normal"){
     const px=Math.sin(clock*.3)*W*.002;
     const py=Math.cos(clock*.25)*H*.002;
 
