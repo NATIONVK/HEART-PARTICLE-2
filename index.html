@@ -197,6 +197,10 @@ input[type="range"]{
   <div class="toggleRow"><label for="rotation3D">3D Heart Rotation</label><input id="rotation3D" type="checkbox" checked></div>
   <div class="toggleRow"><label for="trailToggle">Particle Trails</label><input id="trailToggle" type="checkbox" checked></div>
   <div class="toggleRow"><label for="shockwaveToggle">Heartbeat Shockwaves</label><input id="shockwaveToggle" type="checkbox" checked></div>
+  <div class="toggleRow"><label for="glowAuraToggle">Heart Glow Aura</label><input id="glowAuraToggle" type="checkbox" checked></div>
+  <div class="toggleRow"><label for="sparkleToggle">Sparkle Particles</label><input id="sparkleToggle" type="checkbox" checked></div>
+  <div class="toggleRow"><label for="rainToggle">Particle Rain</label><input id="rainToggle" type="checkbox" checked></div>
+  <div class="toggleRow"><label for="advancedExplosionToggle">Advanced Explosion</label><input id="advancedExplosionToggle" type="checkbox" checked></div>
 
   <p class="panelNote">
     Adjust the heart and particle animation without interrupting the experience.
@@ -224,6 +228,7 @@ const motionInput=document.getElementById("motion");
 const heartbeatInput=document.getElementById("heartbeatControl");
 const autoDissolveInput=document.getElementById("autoDissolve");
 const rotation3DInput=document.getElementById("rotation3D"),trailInput=document.getElementById("trailToggle"),shockwaveInput=document.getElementById("shockwaveToggle");
+const glowAuraInput=document.getElementById("glowAuraToggle"),sparkleInput=document.getElementById("sparkleToggle"),rainInput=document.getElementById("rainToggle"),advancedExplosionInput=document.getElementById("advancedExplosionToggle");
 
 const heartSizeValue=document.getElementById("heartSizeValue");
 const motionValue=document.getElementById("motionValue");
@@ -251,6 +256,8 @@ let heartSizeMultiplier=1;
 let motionMultiplier=3;
 let heartbeatMultiplier=1;
 let autoDissolve=true,rotation3D=true,trailsEnabled=true,shockwavesEnabled=true;
+let glowAuraEnabled=true,sparklesEnabled=true,rainEnabled=true,advancedExplosionEnabled=true;
+let sparkles=[],rainDrops=[],explosionBits=[];
 const PALETTE=[[37,143,255],[157,91,255],[255,76,174],[255,145,58],[34,222,205],[255,220,72]];
 let activeColor="rgb(37,143,255)",activeColorRGB=PALETTE[0].slice(),shockwaves=[],lastHeartbeat=0;
 
@@ -326,6 +333,10 @@ autoDissolveInput.addEventListener("change",()=>{autoDissolve=autoDissolveInput.
 rotation3DInput.addEventListener("change",()=>rotation3D=rotation3DInput.checked);
 trailInput.addEventListener("change",()=>trailsEnabled=trailInput.checked);
 shockwaveInput.addEventListener("change",()=>shockwavesEnabled=shockwaveInput.checked);
+glowAuraInput.addEventListener("change",()=>glowAuraEnabled=glowAuraInput.checked);
+sparkleInput.addEventListener("change",()=>sparklesEnabled=sparkleInput.checked);
+rainInput.addEventListener("change",()=>rainEnabled=rainInput.checked);
+advancedExplosionInput.addEventListener("change",()=>advancedExplosionEnabled=advancedExplosionInput.checked);
 
 /* HEART GEOMETRY */
 
@@ -655,6 +666,50 @@ function drawEnergy(){
   ctx.restore();
 }
 
+/* NEW VISUAL EFFECTS */
+function initExtraEffects(){
+  sparkles=Array.from({length:75},()=>({x:rand(0,W),y:rand(0,H),r:rand(.6,1.8),phase:rand(0,TAU),speed:rand(8,25)}));
+  rainDrops=Array.from({length:95},()=>({x:rand(0,W),y:rand(0,H),vy:rand(45,125),r:rand(.6,1.5),alpha:rand(.15,.5)}));
+}
+function drawHeartAura(){
+  if(!glowAuraEnabled)return;
+  const pulse=1+heartbeat*.12*heartbeatMultiplier,scale=heartScale();
+  ctx.save();ctx.globalCompositeOperation="lighter";
+  const g=ctx.createRadialGradient(heartCenter.x,heartCenter.y,scale*1.5,heartCenter.x,heartCenter.y,scale*(13+heartbeat*4)*pulse);
+  g.addColorStop(0,colorRGBA(.16+heartbeat*.08));g.addColorStop(.35,colorRGBA(.075));g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle=g;ctx.fillRect(heartCenter.x-scale*16,heartCenter.y-scale*16,scale*32,scale*32);ctx.restore();
+}
+function drawSparkles(dt){
+  if(!sparklesEnabled)return;
+  ctx.save();ctx.globalCompositeOperation="lighter";
+  for(const p of sparkles){p.phase+=dt*p.speed*.08;p.y-=dt*p.speed*.35;if(p.y<-5){p.y=H+5;p.x=rand(0,W);}
+    const a=(.18+.55*(.5+.5*Math.sin(p.phase)));
+    ctx.globalAlpha=a;ctx.fillStyle=activeColor;ctx.shadowBlur=9;ctx.shadowColor=activeColor;
+    ctx.beginPath();ctx.arc(p.x+Math.sin(p.phase)*3,p.y,p.r,0,TAU);ctx.fill();
+  }ctx.restore();ctx.globalAlpha=1;
+}
+function drawParticleRain(dt){
+  if(!rainEnabled)return;
+  ctx.save();ctx.globalCompositeOperation="lighter";ctx.strokeStyle=activeColor;ctx.lineWidth=1;
+  for(const p of rainDrops){p.y+=p.vy*dt;if(p.y>H+8){p.y=-8;p.x=rand(0,W);}
+    ctx.globalAlpha=p.alpha;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-2,p.y-7);ctx.stroke();
+  }ctx.restore();ctx.globalAlpha=1;
+}
+function spawnAdvancedExplosion(){
+  if(!advancedExplosionEnabled)return;
+  for(let i=0;i<180;i++){const a=rand(0,TAU),v=rand(65,300);explosionBits.push({x:heartCenter.x,y:heartCenter.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:0,max:rand(.65,1.35),size:rand(.7,2.1)});}
+  if(explosionBits.length>420)explosionBits.splice(0,explosionBits.length-420);
+}
+function updateDrawExplosionBits(dt){
+  if(!explosionBits.length)return;
+  ctx.save();ctx.globalCompositeOperation="lighter";
+  for(let i=explosionBits.length-1;i>=0;i--){const p=explosionBits[i];p.life+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.pow(.975,dt*60);p.vy*=Math.pow(.975,dt*60);
+    if(p.life>=p.max){explosionBits.splice(i,1);continue;}
+    ctx.globalAlpha=1-p.life/p.max;ctx.fillStyle=activeColor;ctx.shadowBlur=10;ctx.shadowColor=activeColor;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,TAU);ctx.fill();
+  }ctx.restore();ctx.globalAlpha=1;
+}
+
 /* HEARTBEAT */
 
 function updateHeartbeat(){
@@ -728,7 +783,7 @@ window.addEventListener("resize",resize,{passive:true});
 
 function explodeHeart(){
   if(mode==="explode")return;
-
+  spawnAdvancedExplosion();
   mode="explode";
 
   for(const p of particles){
@@ -918,6 +973,10 @@ function animate(timestamp){
   }
 
   drawGlassGlow();
+  drawHeartAura();
+  drawSparkles(dt);
+  drawParticleRain(dt);
+  updateDrawExplosionBits(dt);
 
   for(const a of ambient){
     a.update(dt);
@@ -1039,7 +1098,7 @@ function animate(timestamp){
 
 /* START */
 
-resize();document.addEventListener("visibilitychange",()=>{lastTime=0;});
+resize();initExtraEffects();document.addEventListener("visibilitychange",()=>{lastTime=0;});
 requestAnimationFrame(animate);
 
 })();
